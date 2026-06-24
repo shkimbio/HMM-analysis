@@ -3,7 +3,7 @@
 
 
 
-# FIP-HMM Analysis — Soohyun Kim (김수현)
+# FIP-HMM Analysis
 
 fiber photometry ΔF/F 신호에 Gaussian HMM을 적용해 잠재적 신경 활동 state를 추출하고,
 위협(Threat) 및 은신처 진입(Shelter entry) 이벤트에 정렬한 분석 파이프라인.
