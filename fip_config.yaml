@@ -1,0 +1,88 @@
+# ============================================================================
+# fip_config.yaml — EXCEPTION analysis (김수현 / Soohyun Kim dataset)
+#
+# This is a one-off, ISOLATED analysis. It does NOT use the 5xFAD pose-HMM
+# pipeline and must NOT be folded into the main config/roster. Mouse line and
+# task differ from the owner's 5xFAD memory-guided shelter-escape work:
+#   - line: wild-type B6SJL  (NOT 5xFAD Tg/nonTg)
+#   - data: fiber photometry (FIP) ΔF/F  (NO DLC pose / h5 available)
+#   - task: same threat-evoked shelter-escape behaviour
+#
+# Because there is no pose, the HMM is fit DIRECTLY on the photometry signal
+# (latent neural-activity states), then aligned to threat / shelter events.
+# Each mouse carries a DIFFERENT sensor, so each is modelled SEPARATELY
+# (pooling across sensors would be biologically meaningless). n = 1 per sensor
+# -> strictly descriptive single-subject case studies, no group inference.
+# Run with the dedicated py3.11 env: .venv_hmm/Scripts/python.exe
+# ============================================================================
+
+project:
+  name: "FIP-HMM (exception): latent neural-activity states aligned to threat/shelter escape — Soohyun Kim WT B6SJL"
+
+paths:
+  base: "."                            # mouse subfolders live directly in ROOT (Desktop/김수현)
+  tables_dir: "results/tables"
+  figures_dir: "results/figures"
+  reports_dir: "results/reports"
+
+acquisition:
+  fs_fip: 20.0                          # photometry sampling rate (Hz), from data
+
+# One session per mouse; recording region not specified in provided metadata.
+# channel map: which dFF column each sensor corresponds to.
+#   470nm_dFF_corrected(%) = isosbestic(415)-corrected GFP-channel signal
+#   565nm_dFF(%)           = red channel (real jRGECO for 10171; empty control otherwise)
+mice:
+  - id: "10171"
+    sensor: "dLight + jRGECO"
+    line: "B6SJL (WT)"
+    subdir: "FIP_wt_dLight+jRGECO/10171"
+    channels:
+      dLight:  "470nm_dFF_corrected(%)"   # dopamine sensor (DA release)
+      jRGECO:  "565nm_dFF(%)"             # red Ca2+ indicator (neural activity)
+    primary: "dLight"
+    shelter_entry_source: "estimates"     # threat_shelter_response_estimates.csv
+  - id: "10102"
+    sensor: "pdyn-GCaMP"
+    line: "B6SJL (WT)"
+    subdir: "FIP_pdyn_FGCaMP/10102"
+    channels:
+      pdyn_GCaMP: "470nm_dFF_corrected(%)"   # dynorphin+ (direct-pathway/D1-type) MSN Ca2+
+    primary: "pdyn_GCaMP"
+    shelter_entry_source: "events"        # "Shelter Return" events
+
+# ---- Feature construction (criteria + rationale documented in the report) ----
+features:
+  clip_pct: [0.1, 99.9]      # mild outlier clip before z-scoring (keep transients, drop artefacts)
+  level_smooth_s: 0.15       # light smoothing for the LEVEL feature (denoise, keep phasic shape)
+  slope_smooth_s: 0.30       # heavier smoothing before differentiating (stable derivative)
+  use_slope: true            # include d(dFF)/dt -> lets states separate rising/falling vs sustained
+
+# ---- HMM (Gaussian, diagonal cov) — mirrors the prior pipeline's choices ----
+hmm:
+  k_range: [2, 3, 4, 5]
+  force_k: 3
+  covariance_type: "diag"
+  n_iter: 200
+  n_init: 6                  # EM restarts (small data -> can afford more); best train-LL kept
+  seed: 0
+  cv_folds: 5                # contiguous within-session folds for K selection (single session/mouse)
+
+# ---- Event-aligned analysis windows (seconds) ----
+events:
+  threat_dur_s: 10.0
+  threat_window:  [-3.0, 10.0]
+  shelter_window: [-3.0, 6.0]
+
+figure_style:
+  dpi: 300
+  formats: [png, svg]
+  channel_palette:
+    dLight:        "#1F9E89"
+    jRGECO:        "#E5392F"
+    pdyn_GCaMP:    "#2E7D32"
+    CaMKII_GCaMP:  "#6A1B9A"
+  event_palette:
+    Threat:         "#D7263D"
+    Shelter Return: "#1565C0"
+    Shelter Remove: "#EF6C00"
